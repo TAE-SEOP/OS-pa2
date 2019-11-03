@@ -212,19 +212,53 @@ struct scheduler fifo_scheduler = {
 /***********************************************************************
  * SJF scheduler
  ***********************************************************************/
+
+static int sjf_initialize(void)
+{
+	return 0;
+}
+
+static void sjf_finalize(void)
+{
+}
+
+
+
 static struct process *sjf_schedule(void)
 {
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
-	return NULL;
+	struct process *next = NULL;
+
+
+	if (!current || current->status == PROCESS_WAIT) {
+		goto skip;
+	}
+
+	if (current->age < current->lifespan) {
+		return current;
+	}
+
+skip:
+	if (!list_empty(&readyqueue)) {
+		current = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry(next, &readyqueue, list) {
+			if (current->lifespan > next->lifespan) current = next;
+		}
+		list_del_init(&current->list);
+		return current;
+	}
+	return next;
 }
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
-	.release = fcfs_release, /* Use the default FCFS release() */
-	.schedule = NULL,		 /* TODO: Assign sjf_schedule()
+	.release = fcfs_release,/* Use the default FCFS release() */
+	.initialize = sjf_initialize,
+	.finalize = sjf_finalize,
+	.schedule = sjf_schedule,		 /* TODO: Assign sjf_schedule()
 								to this function pointer to activate
 								SJF in the system */
 };
@@ -233,10 +267,46 @@ struct scheduler sjf_scheduler = {
 /***********************************************************************
  * SRTF scheduler
  ***********************************************************************/
+
+static struct process *srtf_schedule(void) 
+{
+
+	struct process *init = NULL;
+	struct process *next = NULL;
+
+	init = list_first_entry(&readyqueue, struct process, list);
+
+	if (init != NULL) {
+		for (int i = 0; i < sizeof(&readyqueue); i++) {
+			if ((init->lifespan) - (init->age) < (list_next_entry(init, list)->age) - (list_next_entry(init, list)->lifespan)) {
+				next = init;
+			}
+			else next = list_next_entry(init, list);
+			init = list_next_entry(init, list);
+		}
+	}
+	list_del_init(&next->list);
+
+	if (!init) {
+		return current;
+	}
+
+	if (!current || current->status == PROCESS_WAIT) {
+		return next;
+	}
+	else {
+		if (current->age <= next->age) return current;
+		else return next;
+	}
+
+
+}
+
 struct scheduler srtf_scheduler = {
 	.name = "Shortest Remaining Time First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
-	.release = fcfs_release, /* Use the default FCFS release() */
+	.release = fcfs_release,
+	.schedule = srtf_schedule,/* Use the default FCFS release() */
 	/* You need to check the newly created processes to implement SRTF.
 	 * Use @forked() callback to mark newly created processes */
 	/* Obviously, you should implement srtf_schedule() and attach it here */
