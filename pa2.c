@@ -79,7 +79,6 @@ bool fcfs_acquire(int resource_id)
 
 	/* And append current to waitqueue */
 	list_add_tail(&current->list, &r->waitqueue);
-
 	/**
 	 * And return false to indicate the resource is not available.
 	 * The scheduler framework will soon call schedule() function to
@@ -111,7 +110,6 @@ void fcfs_release(int resource_id)
 	if (!list_empty(&r->waitqueue)) {
 		struct process *waiter =
 				list_first_entry(&r->waitqueue, struct process, list);
-
 		/**
 		 * Ensure the waiter  is in the wait status
 		 */
@@ -135,8 +133,6 @@ void fcfs_release(int resource_id)
 		list_add_tail(&waiter->list, &readyqueue);
 	}
 }
-
-
 
 #include "sched.h"
 
@@ -286,13 +282,18 @@ static struct process *srtf_schedule(void)
 
 	if (!list_empty(&readyqueue)) {  //readyqueue가 비어있지 않을 경우
 		init = list_first_entry(&readyqueue, struct process, list);
+	}
+		/*
 		list_for_each_entry(next, &readyqueue, list) {
 			if (init->lifespan - init->age > next->lifespan - next->age) init = next;
 		}
+		*/
+
 		if (!current || current->status == PROCESS_WAIT) {   // current가 없을 경우 (readyqueue는 비어있지 않음)
 			list_del_init(&init->list);
 			return init;
 		}
+
 		else {    // current가 있을 경우 (readyqueue는 비어있지 않음)
 			if (current->age < current->lifespan) { // current가 더 일해야 한다면 
 				if (init->lifespan - init->age < current->lifespan - current->age) {   //init이 더 짧으면 init을 list에서 삭제하고 current를 list에 추가하고 init반환
@@ -309,7 +310,6 @@ static struct process *srtf_schedule(void)
 				return init;
 			}
 		}
-	}
 	if (current != NULL || current->status == PROCESS_RUNNING) { // readyqueue가 비어있을 때 current가 있다면 current가 일을 더 해야하면 current를, 안 해도 된다면 NULL을 반환
 		if (current->age < current->lifespan)  
 			return current;
@@ -334,12 +334,52 @@ struct scheduler srtf_scheduler = {
 /***********************************************************************
  * Round-robin scheduler
  ***********************************************************************/
+static int rr_initialize(void)
+{
+	return 0;
+}
+
+static void rr_finalize(void)
+{
+}
+
+static struct process *rr_schedule(void) 
+{
+	struct process * next = NULL;
+	struct process * init = NULL;
+	if (!list_empty(&readyqueue)) {//readyqueue가 비어있지 않다면
+		next = list_first_entry(&readyqueue, struct process, list);
+	}
+
+	if (current != NULL) {  //current가 있다면
+		if (!list_empty(&readyqueue)) {
+			if (current->age < current->lifespan) {
+				list_add_tail(&current->list, &readyqueue);  //일을 더 해야하면 readyqueue에 넣고
+			}
+			list_del_init(&next->list);  // 가져온 next는 readyqueue에서 삭제하고 반환
+			return next;
+		}
+		else {  //readyqueue비어있고 current가 있다면
+			if (current->age < current->lifespan) return current;
+			return next;
+		}
+	}
+	else { //current가 없다면
+		if (!list_empty(&readyqueue)) { //readyqueue가 비어있지 않다면
+			list_del_init(&next->list);  // 가져온 next는 readyqueue에서 삭제하고 반환
+		}
+	    return next;
+	}
+}
+
+
 struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-	                         /* Obviously, you should implement rr_schedule() and attach it here */
-    
+	.initialize = rr_initialize,
+    .finalize = rr_finalize,
+	.schedule = rr_schedule,   /* Obviously, you should implement rr_schedule() and attach it here */
 
 };
 
