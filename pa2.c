@@ -268,48 +268,66 @@ struct scheduler sjf_scheduler = {
  * SRTF scheduler
  ***********************************************************************/
 
+static int srtf_initialize(void)
+{
+	return 0;
+}
+
+static void srtf_finalize(void)
+{
+}
+
+
 static struct process *srtf_schedule(void) 
 {
-
 	struct process *init = NULL;
 	struct process *next = NULL;
 
-	init = list_first_entry(&readyqueue, struct process, list);
 
-	if (init != NULL) {
-		for (int i = 0; i < sizeof(&readyqueue); i++) {
-			if ((init->lifespan) - (init->age) < (list_next_entry(init, list)->age) - (list_next_entry(init, list)->lifespan)) {
-				next = init;
+	if (!list_empty(&readyqueue)) {  //readyqueue가 비어있지 않을 경우
+		init = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry(next, &readyqueue, list) {
+			if (init->lifespan - init->age > next->lifespan - next->age) init = next;
+		}
+		if (!current || current->status == PROCESS_WAIT) {   // current가 없을 경우 (readyqueue는 비어있지 않음)
+			list_del_init(&init->list);
+			return init;
+		}
+		else {    // current가 있을 경우 (readyqueue는 비어있지 않음)
+			if (current->age < current->lifespan) { // current가 더 일해야 한다면 
+				if (init->lifespan - init->age < current->lifespan - current->age) {   //init이 더 짧으면 init을 list에서 삭제하고 current를 list에 추가하고 init반환
+					list_del_init(&init->list);
+					list_add(&current->list, &readyqueue);
+					return init;
+				}
+				else {    // current가 더 짧을 경우
+					return current;
+				}
 			}
-			else next = list_next_entry(init, list);
-			init = list_next_entry(init, list);
+			else {  // current가 더 일안해도 되면 init반환
+				list_del_init(&init->list);
+				return init;
+			}
 		}
 	}
-	list_del_init(&next->list);
-
-	if (!init) {
-		return current;
+	if (current != NULL || current->status == PROCESS_RUNNING) { // readyqueue가 비어있을 때 current가 있다면 current가 일을 더 해야하면 current를, 안 해도 된다면 NULL을 반환
+		if (current->age < current->lifespan)  
+			return current;
 	}
 
-	if (!current || current->status == PROCESS_WAIT) {
-		return next;
-	}
-	else {
-		if (current->age <= next->age) return current;
-		else return next;
-	}
-
-
+	return init;   
 }
+
+
 
 struct scheduler srtf_scheduler = {
 	.name = "Shortest Remaining Time First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release,
 	.schedule = srtf_schedule,/* Use the default FCFS release() */
-	/* You need to check the newly created processes to implement SRTF.
-	 * Use @forked() callback to mark newly created processes */
-	/* Obviously, you should implement srtf_schedule() and attach it here */
+	.initialize = srtf_initialize,  /* You need to check the newly created processes to implement SRTF.*/
+	.finalize = srtf_finalize,    /* Use @forked() callback to mark newly created processes */
+	                          /* Obviously, you should implement srtf_schedule() and attach it here */
 };
 
 
@@ -320,7 +338,9 @@ struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-	/* Obviously, you should implement rr_schedule() and attach it here */
+	                         /* Obviously, you should implement rr_schedule() and attach it here */
+    
+
 };
 
 
