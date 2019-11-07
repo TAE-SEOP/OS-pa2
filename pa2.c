@@ -96,8 +96,10 @@ bool prio_acquire(int resource_id)
 		r->owner = current;
 		return true;
 	}
-
-
+	if (r->owner->prio < current->prio) {
+		r->owner->prio = current->prio;
+	}
+	
 	current->status = PROCESS_WAIT;
 
 	list_add_tail(&current->list, &r->waitqueue);
@@ -432,42 +434,32 @@ static void prio_finalize(void)
 
 
 static struct process *prio_schedule(void) {
-	struct process *init = NULL;
+
+
 	struct process *next = NULL;
 
-
-	if (!list_empty(&readyqueue)) {  //readyqueue가 비어있지 않을 경우
-		init = list_first_entry(&readyqueue, struct process, list);
-		list_for_each_entry(next, &readyqueue, list) {
-			if (init->prio < next->prio) init = next;
-		}
-		if (!current || current->status == PROCESS_WAIT) {   // current가 없을 경우 (readyqueue는 비어있지 않음)
-			list_del_init(&init->list);
-			return init;
-		}
-		else {    // current가 있을 경우 (readyqueue는 비어있지 않음)
-			if (current->age < current->lifespan) { // current가 더 일해야 한다면 
-				if (init->lifespan - init->age < current->lifespan - current->age) {   //init이 더 짧으면 init을 list에서 삭제하고 current를 list에 추가하고 init반환
-					list_del_init(&init->list);
-					list_add(&current->list, &readyqueue);
-					return init;
-				}
-				else {    // current가 더 짧을 경우
-					return current;
-				}
-			}
-			else {  // current가 더 일안해도 되면 init반환
-				list_del_init(&init->list);
-				return init;
-			}
-		}
-	}
-	if (current != NULL || current->status == PROCESS_RUNNING) { // readyqueue가 비어있을 때 current가 있다면 current가 일을 더 해야하면 current를, 안 해도 된다면 NULL을 반환
-		if (current->age < current->lifespan)
-			return current;
+	if (!current || current->status == PROCESS_WAIT) {
+		goto skip;
 	}
 
-	return init;
+	if (current->age < current->lifespan) {
+		list_add_tail(&current->list, &readyqueue);
+	}
+
+skip:
+
+	if (!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry(current, &readyqueue, list) {
+			if (next->prio < current->prio) next = current;
+		}
+
+		list_del_init(&next->list);
+	}
+
+	return next;
+
+
 }
 
 
