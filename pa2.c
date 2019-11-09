@@ -420,8 +420,12 @@ void prio_release(int resource_id)
 	r->owner = NULL;
 
 	if (!list_empty(&r->waitqueue)) {
+		struct process *next = NULL;
 		struct process *waiter =
 			list_first_entry(&r->waitqueue, struct process, list);
+		list_for_each_entry(next, &r->waitqueue, list) {
+			if (waiter->prio < next->prio) waiter = next;
+		}
 		assert(waiter->status == PROCESS_WAIT);
 
 		list_del_init(&waiter->list);
